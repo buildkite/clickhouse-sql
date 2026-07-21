@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
-require "rails_helper"
+require "spec_helper"
+
+require_relative "../../../../lib/clickhouse/http_client"
+require_relative "../../../../lib/clickhouse/sql"
 
 RSpec.describe ClickHouse::HTTPClient::Query do
   describe ".wrap" do

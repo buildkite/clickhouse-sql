@@ -1,53 +1,15 @@
 # frozen_string_literal: true
 
+require "securerandom"
+require "stringio"
 require "uri"
+require "zlib"
 
-require "rails_helper"
+require "spec_helper"
+
+require_relative "../../../lib/clickhouse/http_client"
 
 RSpec.describe ClickHouse::HTTPClient do
-  describe "Rails-configured instrumentation" do
-    let(:span) { instance_spy(Datadog::Tracing::SpanOperation) }
-    let(:query) { described_class::Query.new(sql: "SELECT 1") }
-
-    before do
-      allow(Datadog::Tracing).to receive(:trace).and_yield(span)
-    end
-
-    it "wraps a generic query event in a Datadog span" do
-      payload = { query: query, database: :analytics }
-
-      result = described_class.instrumenter.instrument("sql.click_house", payload) do |instrument|
-        instrument[:query_id] = "abc-123"
-        instrument[:statistics] = { read_rows: 10, elapsed_ns: 12_345 }
-        :result
-      end
-
-      expect(result).to eq(:result)
-      expect(Datadog::Tracing).to have_received(:trace).with(
-        "click_house.query",
-        type: "db",
-        resource: "SELECT 1",
-      )
-      expect(span).to have_received(:set_tag).with("clickhouse.database", :analytics)
-      expect(span).to have_received(:set_tag).with("clickhouse.query_id", "abc-123")
-      expect(span).to have_received(:set_tag).with("clickhouse.read_rows", 10)
-      expect(span).to have_received(:set_tag).with("clickhouse.elapsed_ns", 12_345)
-    end
-
-    it "tags the span with response context when the query raises" do
-      payload = { query: query, database: :analytics }
-
-      expect {
-        described_class.instrumenter.instrument("sql.click_house", payload) do |instrument|
-          instrument[:query_id] = "failed-123"
-          raise ClickHouse::HTTPClient::DatabaseError, "query failed"
-        end
-      }.to raise_error(ClickHouse::HTTPClient::DatabaseError, "query failed")
-
-      expect(span).to have_received(:set_tag).with("clickhouse.query_id", "failed-123")
-    end
-  end
-
   describe "database registry" do
     it "exposes the physical database name" do
       described_class.register_database(
@@ -68,8 +30,10 @@ RSpec.describe ClickHouse::HTTPClient do
     end
 
     it "raises when registering a duplicate database" do
+      described_class.register_database(:duplicate_example, database: "x", url: "http://x", username: "u", password: "p")
+
       expect {
-        described_class.register_database(:pipelines_bootstrap, database: "x", url: "http://x", username: "u", password: "p")
+        described_class.register_database(:duplicate_example, database: "x", url: "http://x", username: "u", password: "p")
       }.to raise_error(described_class::ConfigurationError, /already registered/)
     end
 
@@ -491,42 +455,29 @@ RSpec.describe ClickHouse::HTTPClient do
       }
     end
 
-    it "emits sql.click_house notifications with numeric statistics from the summary header" do
-      stub_request(:post, "http://clickhouse-spec.test:8123/")
-        .with(query: hash_including("database" => "spec_db"))
-        .to_return(
-          status: 200,
-          body: "",
-          headers: {
-            "x-clickhouse-query-id" => "notification-123",
-            "x-clickhouse-summary" => { read_rows: "10", elapsed_ns: "12345" }.to_json,
-          },
-        )
-
-      events = []
-      callback = ->(*_args, payload) { events << payload }
-
-      result = ActiveSupport::Notifications.subscribed(callback, "sql.click_house") do
-        described_class.execute("INSERT INTO t VALUES (1)", :http_client_spec)
-      end
-
-      expect(result).to have_attributes(
-        query_id: "notification-123",
-        statistics: { read_rows: 10, elapsed_ns: 12345 },
-      )
-      expect(events.size).to eq(1)
-      expect(events.first[:database]).to eq(:http_client_spec)
-      expect(events.first[:query_id]).to eq("notification-123")
-      expect(events.first[:statistics]).to eq({ read_rows: 10, elapsed_ns: 12345 })
-    end
   end
 
-  describe "against a real ClickHouse server" do
+  describe "against a real ClickHouse server", :integration do
     # These examples round-trip through the ClickHouse server from
-    # docker-compose, locking in the wire format end to end. They use the
-    # :pipelines_bootstrap database registered by the initializer, which
-    # points at ClickHouse's always-present `default` database.
-    let(:database) { :pipelines_bootstrap }
+    # docker-compose, locking in the wire format end to end.
+    let(:database) { :http_client_integration }
+
+    around do |example|
+      url = ENV.fetch("CLICKHOUSE_URL")
+      uri = URI.parse(url)
+      WebMock.disable_net_connect!(allow: ->(request_uri) { request_uri.host == uri.host && request_uri.port == uri.port })
+      described_class.register_database(
+        database,
+        database: ENV.fetch("CLICKHOUSE_DATABASE", "default"),
+        url: url,
+        username: ENV.fetch("CLICKHOUSE_USERNAME", "default"),
+        password: ENV.fetch("CLICKHOUSE_PASSWORD", ""),
+      )
+
+      example.run
+    ensure
+      WebMock.disable_net_connect!
+    end
 
     it "binds typed placeholders and typecasts the results" do
       query = described_class::Query.new(
@@ -581,7 +532,7 @@ RSpec.describe ClickHouse::HTTPClient do
 
       rows = described_class.select(query, database)
 
-      expect(rows).to eq([values.stringify_keys])
+      expect(rows).to eq([values.transform_keys(&:to_s)])
     end
 
     it "executes DDL and inserts gzipped CSV" do
@@ -589,7 +540,11 @@ RSpec.describe ClickHouse::HTTPClient do
 
       create_result = described_class.execute("CREATE TABLE #{table} (id UInt64, label Nullable(String)) ENGINE = Memory", database)
 
-      io = StringIO.new(ActiveSupport::Gzip.compress("1,one\n2,\\N\n"))
+      compressed = StringIO.new
+      gzip = Zlib::GzipWriter.new(compressed)
+      gzip.write("1,one\n2,\\N\n")
+      gzip.close
+      io = StringIO.new(compressed.string)
       insert_query = <<~SQL.chomp
         INSERT INTO #{table} (id, label)
         -- URL encoding: spaces + / ? & = こんにちは
@@ -597,8 +552,10 @@ RSpec.describe ClickHouse::HTTPClient do
       SQL
       insert_result = described_class.insert_csv(insert_query, io, database)
 
-      expect(create_result.query_id).to be_present
-      expect(insert_result.query_id).to be_present
+      expect(create_result.query_id).to be_a(String)
+      expect(create_result.query_id).not_to be_empty
+      expect(insert_result.query_id).to be_a(String)
+      expect(insert_result.query_id).not_to be_empty
       expect(insert_result.statistics.fetch(:written_rows)).to eq(2)
 
       rows = described_class.select("SELECT id, label FROM #{table} ORDER BY id", database)

@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
-require "rails_helper"
+require "spec_helper"
+
+require_relative "../../../../lib/clickhouse/http_client"
 
 RSpec.describe ClickHouse::HTTPClient::ParameterSerializer do
   it "handles simple string" do
@@ -87,18 +89,18 @@ RSpec.describe ClickHouse::HTTPClient::ParameterSerializer do
   end
 
   it "handles time ala date_time_input_format=basic" do
-    t = Time.zone.parse("2025-05-07 17:27:42.123")
+    t = Time.utc(2025, 5, 7, 17, 27, 42, 123_000)
     expect(serialize(t)).to eq("2025-05-07 17:27:42")
   end
 
   it "converts zoned times to UTC" do
     # ClickHouse interprets rendered DateTime text in the placeholder's (or
     # server's) timezone, so only UTC wall-clock text is safe to send.
-    melbourne = Time.find_zone!("Australia/Melbourne").parse("2025-05-07 17:27:42")
+    melbourne = Time.new(2025, 5, 7, 17, 27, 42, "+10:00")
     expect(serialize(melbourne)).to eq("2025-05-07 07:27:42")
 
-    offset = Time.new(2025, 5, 7, 17, 27, 42, "+10:00")
-    expect(serialize(offset)).to eq("2025-05-07 07:27:42")
+    adelaide = Time.new(2025, 5, 7, 17, 27, 42, "+09:30")
+    expect(serialize(adelaide)).to eq("2025-05-07 07:57:42")
   end
 
   it "handles date" do
@@ -107,8 +109,8 @@ RSpec.describe ClickHouse::HTTPClient::ParameterSerializer do
 
   it "handles array of times" do
     times = [
-      Time.zone.parse("2025-05-07 17:27:42.123"),
-      Time.zone.parse("2025-05-08 00:00:00.000"),
+      Time.utc(2025, 5, 7, 17, 27, 42, 123_000),
+      Time.utc(2025, 5, 8),
     ]
     expect(serialize(times)).to eq("['2025-05-07 17:27:42','2025-05-08 00:00:00']")
   end
