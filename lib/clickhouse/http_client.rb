@@ -38,8 +38,7 @@ module ClickHouse
   # Derived in part from GitLab's MIT-licensed click_house-client gem;
   # see LICENSE.
   module HTTPClient
-    # Emitted around every query; config/initializers/clickhouse.rb subscribes
-    # to accumulate per-request query counts and durations.
+    # Instrumentation event emitted around every query.
     NOTIFICATION_NAME = "sql.click_house"
     QUERY_ID_HEADER = "x-clickhouse-query-id"
     private_constant :QUERY_ID_HEADER
@@ -55,26 +54,24 @@ module ClickHouse
     end
     private_constant :NOOP_INSTRUMENTER
 
-    # Module-level state is written once during boot by
-    # config/initializers/clickhouse.rb (logger, instrumenter, database
-    # registry), so plain class instance variables are safe here.
+    # Applications typically configure the logger, instrumenter, and database
+    # registry once during initialization.
     class << self
-      # @return [Logger] Structured query logger; set from the initializer.
+      # @return [Logger] Structured query logger.
       attr_writer :logger # rubocop:disable ThreadSafety/ClassAndModuleAttributes
 
       def logger
         @logger ||= Logger.new(IO::NULL) # rubocop:disable ThreadSafety/ClassInstanceVariable
       end
 
-      # @return [#instrument] Query instrumenter; set from the initializer.
+      # @return [#instrument] Query instrumenter.
       attr_writer :instrumenter # rubocop:disable ThreadSafety/ClassAndModuleAttributes
 
       def instrumenter
         @instrumenter || NOOP_INSTRUMENTER # rubocop:disable ThreadSafety/ClassInstanceVariable
       end
 
-      # Registers a database connection under a name; called once at boot from
-      # config/initializers/clickhouse.rb.
+      # Registers a database connection under a name.
       def register_database(name, **args)
         raise ConfigurationError, "The database '#{name}' is already registered" if databases.key?(name)
 

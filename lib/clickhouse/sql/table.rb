@@ -9,15 +9,15 @@ module ClickHouse
     # unambiguous when a query joins tables with overlapping column names.
     #
     # @example Qualified columns from a table handle
-    #   requests = CH.table("requests")
-    #   endpoints = CH.table("endpoints", as: "e")
+    #   events = CH.table("events")
+    #   accounts = CH.table("accounts", as: "a")
     #
-    #   CH.select(requests[:endpoint_id])
-    #     .from(requests)
-    #     .left_join(endpoints, final: true, on: [
-    #       CH.fragment("{} = {}", endpoints[:id], requests[:endpoint_id]),
+    #   CH.select(events[:account_id])
+    #     .from(events)
+    #     .left_join(accounts, final: true, on: [
+    #       CH.fragment("{} = {}", accounts[:id], events[:account_id]),
     #     ])
-    #     .where("{} >= {from:DateTime64(6)}", requests[:timestamp], from: from_time)
+    #     .where("{} >= {from:DateTime64(6)}", events[:timestamp], from: from_time)
     class Table
       include Part
 

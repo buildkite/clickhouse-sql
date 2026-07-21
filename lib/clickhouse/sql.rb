@@ -32,17 +32,17 @@ module ClickHouse
   # @example Build and execute a typed SELECT query joining two tables
   #   CH = ClickHouse::SQL
   #
-  #   requests = CH.table("requests")
-  #   endpoints = CH.table("endpoints", as: "e")
+  #   events = CH.table("events")
+  #   accounts = CH.table("accounts", as: "a")
   #
   #   query = CH
-  #     .select(requests.columns(:id, :timestamp), endpoints[:state])
-  #     .from(requests)
-  #     .left_join(endpoints, final: true, on: [
-  #       CH.fragment("{} = {}", endpoints[:id], requests[:endpoint_id]),
+  #     .select(events.columns(:id, :timestamp), accounts[:status])
+  #     .from(events)
+  #     .left_join(accounts, final: true, on: [
+  #       CH.fragment("{} = {}", accounts[:id], events[:account_id]),
   #     ])
-  #     .where("{} = {service_id:UUID}", requests[:service_id], service_id: service.id)
-  #     .where("{}.{tag_key:Identifier} = {value:String}", requests[:tags], tag_key: "geo.country", value: "AU")
+  #     .where("{} = {account_id:UUID}", events[:account_id], account_id: account_id)
+  #     .where("{}.{tag_key:Identifier} = {value:String}", events[:tags], tag_key: "geo.country", value: "AU")
   #
   #   ClickHouse::HTTPClient.select(query.to_query, :analytics)
   module SQL
