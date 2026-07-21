@@ -35,8 +35,8 @@ module ClickHouse
   # (e.g. ClickHouse::SQL) are expected to validate nil against placeholder
   # types before execution.
   #
-  # Derived in part from GitLab's MIT-licensed click_house-client gem
-  # (see lib/clickhouse/LICENSE), distilled to the subset Buildkite uses.
+  # Derived in part from GitLab's MIT-licensed click_house-client gem;
+  # see LICENSE.
   module HTTPClient
     # Emitted around every query; config/initializers/clickhouse.rb subscribes
     # to accumulate per-request query counts and durations.

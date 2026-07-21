@@ -5,6 +5,8 @@ module ClickHouse
     # Emits sequential `$1`-style bind markers when rendering redacted SQL,
     # so every typed placeholder in a query gets a stable positional marker
     # suitable for external log aggregation.
+    #
+    # Derived from GitLab's MIT-licensed click_house-client gem; see LICENSE.
     class BindIndexManager
       # @param start_index [Integer] Index of the first bind marker.
       def initialize(start_index = 1)
