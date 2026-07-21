@@ -112,6 +112,11 @@ module ClickHouse
 
             raise Error, "nil bound to non-Nullable placeholder {#{name}:#{type}}; declare the type as Nullable(...) to bind NULL"
           elsif contains_nil?(value)
+            # Containment heuristic, not positional: one Nullable(...)
+            # member permits nils anywhere in the bound container, so e.g. a
+            # nil key in Map(String, Nullable(String)) slips through to
+            # ClickHouse. Positional validation would require parsing
+            # composite types.
             next if type.include?("Nullable(")
 
             raise Error, "nil element bound to non-Nullable placeholder {#{name}:#{type}}; declare the element type as Nullable(...) to bind NULLs"

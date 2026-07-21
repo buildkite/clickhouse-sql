@@ -39,6 +39,12 @@ module ClickHouse
           elements = input.map { |k, v| serialize_nested(k) + ":" + serialize_nested(v) }
           "{#{elements.join(",")}}"
 
+        when DateTime
+          # DateTime is a Date subclass, so it must be matched first and
+          # converted to a Time (preserving its offset) to render as UTC
+          # wall-clock text like Time below, not as a date-only string.
+          serialize(input.to_time)
+
         when Date
           input.to_s # Ruby and ClickHouse agree on YYYY-MM-DD
 

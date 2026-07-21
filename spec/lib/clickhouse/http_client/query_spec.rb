@@ -74,6 +74,23 @@ RSpec.describe ClickHouse::HTTPClient::Query do
     expect(query.placeholders).to be_frozen
   end
 
+  it "deeply copies and freezes nested placeholder values" do
+    ids = [1, 2]
+    headers = { "accept" => +"text/html" }
+    query = described_class.new(
+      sql: "SELECT {ids:Array(UInt64)}, {headers:Map(String, String)}",
+      placeholders: { ids: ids, headers: headers },
+    )
+
+    ids << 3
+    headers["accept"] << ";q=0.9"
+
+    expect(query.placeholders).to eq(ids: [1, 2], headers: { "accept" => "text/html" })
+    expect(query.placeholders[:ids]).to be_frozen
+    expect(query.placeholders[:headers]).to be_frozen
+    expect(query.placeholders[:headers]["accept"]).to be_frozen
+  end
+
   it "responds to the query protocol itself" do
     query = described_class.new(sql: "SELECT 1")
 

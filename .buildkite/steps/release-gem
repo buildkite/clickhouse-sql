@@ -48,7 +48,7 @@ echo "--- Check if version already exists on rubygems.org"
 
 if [ "$(curl -s -o /dev/null -w "%{http_code}" "https://rubygems.org/api/v2/rubygems/clickhouse-sql/versions/${VERSION}.json")" == "200" ]; then
   echo "Gem version ${VERSION} already found on rubygems, skipping release"
-  exit 1
+  exit 0
 fi
 
 echo "--- Publishing gem"

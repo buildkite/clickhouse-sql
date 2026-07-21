@@ -39,7 +39,9 @@ module ClickHouse
 
         super(
           sql: -sql.to_s,
-          placeholders: ValueNormalization.symbolize_keys(placeholders || {}).freeze,
+          placeholders: ValueNormalization.immutable_copy(
+            ValueNormalization.symbolize_keys(placeholders || {}),
+          ),
         )
       end
 

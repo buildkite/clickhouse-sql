@@ -121,7 +121,8 @@ rows = ClickHouse::HTTPClient.select(query, :analytics)
 ```
 
 `select` returns an array of string-keyed hashes. It typecasts integer and
-float widths, `Date`/`Date32`, UTC `DateTime`/`DateTime64`, `Interval*`, and
+float widths, `Date`/`Date32`, UTC `DateTime`/`DateTime64`,
+`IntervalSecond`/`IntervalMillisecond`, and
 arrays of supported types. UTC datetimes become UTC Ruby `Time` values;
 `IntervalSecond` is integer seconds and `IntervalMillisecond` is floating-point
 seconds. Non-UTC datetimes and unrecognized types, including `Map` and `Tuple`

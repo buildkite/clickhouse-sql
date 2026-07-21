@@ -107,6 +107,22 @@ RSpec.describe ClickHouse::HTTPClient::ParameterSerializer do
     expect(serialize(Date.parse("2025-05-07"))).to eq("2025-05-07")
   end
 
+  it "handles DateTime like Time, not like its Date superclass" do
+    utc = DateTime.new(2025, 5, 7, 17, 27, 42)
+    expect(serialize(utc)).to eq("2025-05-07 17:27:42")
+
+    melbourne = DateTime.new(2025, 5, 7, 17, 27, 42, "+10:00")
+    expect(serialize(melbourne)).to eq("2025-05-07 07:27:42")
+  end
+
+  it "handles array of DateTimes" do
+    datetimes = [
+      DateTime.new(2025, 5, 7, 17, 27, 42),
+      DateTime.new(2025, 5, 8, 0, 0, 0, "+10:00"),
+    ]
+    expect(serialize(datetimes)).to eq("['2025-05-07 17:27:42','2025-05-07 14:00:00']")
+  end
+
   it "handles array of times" do
     times = [
       Time.utc(2025, 5, 7, 17, 27, 42, 123_000),
