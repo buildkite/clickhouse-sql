@@ -1,0 +1,16 @@
+services:
+  clickhouse:
+    image: clickhouse:25.12
+    environment:
+      CLICKHOUSE_PASSWORD: spec_pass
+
+  test:
+    image: ruby:3.4.10
+    working_dir: /work
+    volumes:
+      - .:/work
+    environment:
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_PASSWORD: spec_pass
+    depends_on:
+      - clickhouse

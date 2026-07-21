@@ -9,13 +9,13 @@ Gem::Specification.new do |spec|
   spec.email = ["paul@buildkite.com"]
 
   spec.summary = "A typed ClickHouse SQL query builder and HTTP transport client"
-  spec.description = spec.summary
+  spec.description = "Build composable ClickHouse SELECT queries with typed placeholders and execute them over HTTP."
   spec.homepage = "https://github.com/buildkite/clickhouse-sql"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.4"
   spec.metadata = {
     "homepage_uri" => spec.homepage,
-    "source_code_uri" => spec.homepage,
+    "source_code_uri" => "#{spec.homepage}/tree/main",
     "changelog_uri" => "#{spec.homepage}/blob/main/CHANGELOG.md",
     "rubygems_mfa_required" => "true",
   }
