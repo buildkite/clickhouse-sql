@@ -1,0 +1,42 @@
+agents:
+  queue: hosted
+
+steps:
+  - label: ":ruby: Unit and wire specs"
+    command:
+      - gem install bundler -v 4.0.16 --no-document
+      - bundle _4.0.16_ install
+      - bundle _4.0.16_ exec rake
+    plugins:
+      - docker#v5.12.0:
+          image: ruby:3.4.10
+
+  - label: ":clickhouse: ClickHouse 25.12 integration specs"
+    command:
+      - gem install bundler -v 4.0.16 --no-document
+      - bundle _4.0.16_ install
+      - ruby -rnet/http -e '60.times { begin; exit 0 if Net::HTTP.get_response(URI("http://clickhouse:8123/ping")).is_a?(Net::HTTPSuccess); rescue StandardError; end; sleep 1 }; abort "ClickHouse did not become ready"'
+      - bundle _4.0.16_ exec rspec --tag integration
+    plugins:
+      - docker-compose#v5.12.1:
+          config: docker-compose.yml
+          run: test
+
+  - label: ":rubygems: Build and clean-install smoke test"
+    command:
+      - gem install bundler -v 4.0.16 --no-document
+      - bundle _4.0.16_ install
+      - bundle _4.0.16_ exec rake build
+      - >-
+        ruby -rrubygems/package -e 'package = Gem::Package.new(Dir["pkg/*.gem"].fetch(0));
+        spec = package.spec;
+        expected = Dir["lib/**/*.rb", "README.md", "LICENSE", "CHANGELOG.md"].sort;
+        abort "unexpected package contents: #{spec.files.sort.inspect}" unless spec.files.sort == expected;
+        abort "runtime dependencies packaged" unless spec.runtime_dependencies.empty?;
+        abort "wrong license" unless spec.license == "MIT";
+        abort "wrong Ruby requirement" unless spec.required_ruby_version.to_s == ">= 3.4";
+        abort "MFA metadata missing" unless spec.metadata["rubygems_mfa_required"] == "true"'
+      - export GEM_HOME="$$(mktemp -d)"; export GEM_PATH="$$GEM_HOME"; gem install --local --no-document pkg/clickhouse-sql-0.1.0.gem; ruby -e 'require "clickhouse-sql"; abort unless defined?(ClickHouse::SQL) && defined?(ClickHouse::HTTPClient) && ClickHouse::SQL::VERSION == "0.1.0"'; ruby -e 'require "clickhouse/sql"; abort unless ClickHouse::SQL.select("id").from("events").to_query.to_sql.include?("FROM events")'; ruby -e 'require "clickhouse/http_client"; abort unless ClickHouse::HTTPClient::ParameterSerializer.serialize(["a", nil]) == "['\''a'\'',NULL]"'
+    plugins:
+      - docker#v5.12.0:
+          image: ruby:3.4.10
