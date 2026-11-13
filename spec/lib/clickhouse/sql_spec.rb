@@ -353,6 +353,8 @@ RSpec.describe ClickHouse::SQL do
     end
 
     it "normalizes Time-compatible wrappers to UTC without requiring a Time subclass" do
+      # ActiveSupport::TimeWithZone reports is_a?(Time) without subclassing Time.
+      # Keep that protocol covered without depending on ActiveSupport.
       time_wrapper = Class.new do
         def initialize(time)
           @time = time
