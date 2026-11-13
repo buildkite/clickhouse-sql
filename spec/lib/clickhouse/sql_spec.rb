@@ -352,27 +352,27 @@ RSpec.describe ClickHouse::SQL do
       expect(fragment.placeholders).to eq(ts: "2026-07-01 02:00:00.000")
     end
 
-    it "normalizes ActiveSupport TimeWithZone values to UTC when supplied by the host" do
-      source = <<~'RUBY'
-        require "active_support"
-        require "active_support/time"
-        require "clickhouse/sql"
+    it "normalizes Time-compatible wrappers to UTC without requiring a Time subclass" do
+      time_wrapper = Class.new do
+        def initialize(time)
+          @time = time
+        end
 
-        melbourne = Time.utc(2026, 7, 1, 2, 30, 0).in_time_zone("Australia/Melbourne")
-        fragment = ClickHouse::SQL.fragment("timestamp >= {ts:DateTime64(6)}", ts: melbourne)
+        def is_a?(type)
+          type == Time || super
+        end
 
-        abort fragment.placeholders.inspect unless fragment.placeholders == { ts: "2026-07-01 02:30:00.000000" }
-      RUBY
+        def to_time
+          @time
+        end
+      end
 
-      stdout, stderr, status = Open3.capture3(
-        RbConfig.ruby,
-        "-I",
-        File.expand_path("../../../lib", __dir__),
-        "-e",
-        source
+      fragment = described_class.fragment(
+        "timestamp >= {ts:DateTime64(6)}",
+        ts: time_wrapper.new(Time.new(2026, 7, 1, 12, 30, Rational(123456, 1_000_000), "+10:00"))
       )
 
-      expect(status).to be_success, "subprocess failed:\n#{stdout}\n#{stderr}"
+      expect(fragment.placeholders).to eq(ts: "2026-07-01 02:30:00.123456")
     end
 
     it "normalizes zoned times to UTC for DateTime and unformatted DateTime64 placeholders" do

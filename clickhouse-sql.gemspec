@@ -23,7 +23,6 @@ Gem::Specification.new do |spec|
   spec.files = Dir["lib/**/*.rb", "README.md", "LICENSE", "CHANGELOG.md"]
   spec.require_paths = ["lib"]
 
-  spec.add_development_dependency "activesupport", ">= 8.0", "< 9"
   spec.add_development_dependency "rake", "~> 13.4"
   spec.add_development_dependency "rspec", "~> 3.13"
   spec.add_development_dependency "webmock", "~> 3.26"
